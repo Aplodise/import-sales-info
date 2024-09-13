@@ -4,8 +4,9 @@ import com.roman.import_sales_info.batch.dto.SalesInfoDto;
 import com.roman.import_sales_info.batch.mapper.SalesInfoMapper;
 import com.roman.import_sales_info.domain.SalesInfo;
 import org.springframework.batch.item.ItemProcessor;
+import org.springframework.stereotype.Component;
 
-
+@Component
 public class SalesInfoItemProcessor implements ItemProcessor<SalesInfoDto, SalesInfo> {
     private SalesInfoMapper salesInfoMapper;
     @Override
