@@ -8,12 +8,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.integration.async.AsyncItemProcessor;
 import org.springframework.batch.integration.async.AsyncItemWriter;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.JpaItemWriter;
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
@@ -21,6 +23,7 @@ import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -32,34 +35,34 @@ import java.util.concurrent.ThreadPoolExecutor;
 @RequiredArgsConstructor
 public class SalesInfoJobConfig {
 
-    @Value("${input.csv.store}")
-    private Resource resource;
+
     private final EntityManagerFactory entityManagerFactory;
     private final SalesInfoItemProcessor itemProcessor;
 
     @Bean
-    public Job importSalesInfo(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
+    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
-                .start(fromFileToDb(jobRepository, platformTransactionManager))
+                .start(fromFileToDb)
                 .build();
     }
 
-
-    public Step fromFileToDb(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
+    @Bean
+    public Step fromFileToDb(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader<SalesInfoDto> salesInfoDtoItemReader){
         return new StepBuilder("fromFileToDb", jobRepository)
                 .<SalesInfoDto, SalesInfo>chunk(100, platformTransactionManager)
                 .taskExecutor(taskExecutor())
-                .reader(salesInfoFileItemReader())
+                .reader(salesInfoDtoItemReader)
                 .processor(itemProcessor)
                 .writer(salesInfoJpaItemWriter())
                 .build();
     }
-
-    public FlatFileItemReader<SalesInfoDto> salesInfoFileItemReader(){
+    @Bean
+    @StepScope
+    public FlatFileItemReader<SalesInfoDto> salesInfoFileItemReader(@Value("#{jobParameters['input.file.name']}") String resource){
         return new FlatFileItemReaderBuilder<SalesInfoDto>()
+                .resource(new FileSystemResource(resource))
                 .name("sales info reader")
-                .resource(resource)
                 .linesToSkip(1)
                 .delimited()
                 .delimiter(",")

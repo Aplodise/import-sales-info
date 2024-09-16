@@ -2,7 +2,6 @@ package com.roman.import_sales_info.batch.integration;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.launch.support.SimpleJobLauncher;
 import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.integration.launch.JobLaunchingGateway;
@@ -44,6 +43,7 @@ public class SalesInfoIntegrationConfig {
                 .handle(fileRenameProcessHandler())
                 .transform(fileMessageToJobRequest())
                 .handle(jobLaunchingGateway())
+                .channel("nullChannel")
                 .log()
                 .get();
     }
@@ -75,6 +75,7 @@ public class SalesInfoIntegrationConfig {
 
     public FileMessageToJobRequest fileMessageToJobRequest(){
         var transformer = new FileMessageToJobRequest();
+        transformer.setFilename("input.file.name");
         transformer.setJob(job);
        return transformer;
     }
