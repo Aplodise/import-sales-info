@@ -20,6 +20,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -44,6 +46,7 @@ public class SalesInfoJobConfig {
     public Step fromFileToDb(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
         return new StepBuilder("fromFileToDb", jobRepository)
                 .<SalesInfoDto, SalesInfo>chunk(25, platformTransactionManager)
+                .taskExecutor(taskExecutor())
                 .reader(salesInfoFileItemReader())
                 .processor(itemProcessor)
                 .writer(salesInfoJpaItemWriter())
@@ -66,5 +69,15 @@ public class SalesInfoJobConfig {
         return new JpaItemWriterBuilder<SalesInfo>()
                 .entityManagerFactory(entityManagerFactory)
                 .build();
+    }
+
+    public TaskExecutor taskExecutor(){
+        var executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(10);
+        executor.setThreadNamePrefix("Thread N -> ");
+        executor.initialize();
+        return executor;
     }
 }

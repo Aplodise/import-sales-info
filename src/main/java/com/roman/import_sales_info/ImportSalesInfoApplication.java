@@ -2,6 +2,7 @@ package com.roman.import_sales_info;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.boot.CommandLineRunner;
@@ -19,7 +20,7 @@ public class ImportSalesInfoApplication {
 	@Bean
 	public CommandLineRunner commandLineRunner(JobLauncher jobLauncher, Job job){
 		return commandLineRunner -> {
-			jobLauncher.run(job, new JobParameters());
+			jobLauncher.run(job, new JobParametersBuilder().addLong("Time", System.currentTimeMillis()).toJobParameters());
 		};
 	}
 }
