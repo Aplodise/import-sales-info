@@ -17,10 +17,4 @@ public class ImportSalesInfoApplication {
 		SpringApplication.run(ImportSalesInfoApplication.class, args);
 	}
 
-	@Bean
-	public CommandLineRunner commandLineRunner(JobLauncher jobLauncher, Job job){
-		return commandLineRunner -> {
-			jobLauncher.run(job, new JobParametersBuilder().addLong("Time", System.currentTimeMillis()).toJobParameters());
-		};
-	}
 }
