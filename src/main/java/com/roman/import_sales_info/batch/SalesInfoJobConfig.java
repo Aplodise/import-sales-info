@@ -12,6 +12,8 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.integration.async.AsyncItemProcessor;
+import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.database.JpaItemWriter;
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
@@ -23,6 +25,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
 @Slf4j
@@ -45,7 +48,7 @@ public class SalesInfoJobConfig {
 
     public Step fromFileToDb(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
         return new StepBuilder("fromFileToDb", jobRepository)
-                .<SalesInfoDto, SalesInfo>chunk(25, platformTransactionManager)
+                .<SalesInfoDto, SalesInfo>chunk(100, platformTransactionManager)
                 .taskExecutor(taskExecutor())
                 .reader(salesInfoFileItemReader())
                 .processor(itemProcessor)
@@ -77,7 +80,20 @@ public class SalesInfoJobConfig {
         executor.setMaxPoolSize(5);
         executor.setQueueCapacity(10);
         executor.setThreadNamePrefix("Thread N -> ");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
+    }
+
+    public AsyncItemProcessor<SalesInfoDto, SalesInfo> asyncItemProcessor(){
+        var asyncItemProcessor = new AsyncItemProcessor<SalesInfoDto, SalesInfo>();
+        asyncItemProcessor.setDelegate(itemProcessor);
+        asyncItemProcessor.setTaskExecutor(taskExecutor());
+        return asyncItemProcessor;
+    }
+    public AsyncItemWriter<SalesInfo> asyncItemWriter(){
+        var asyncItemWriter = new AsyncItemWriter<SalesInfo>();
+        asyncItemWriter.setDelegate(salesInfoJpaItemWriter());
+        return asyncItemWriter;
     }
 }
