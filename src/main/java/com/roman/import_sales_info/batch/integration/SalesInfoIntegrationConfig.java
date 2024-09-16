@@ -7,11 +7,14 @@ import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.integration.launch.JobLaunchingGateway;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.integration.annotation.IntegrationComponentScan;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.config.EnableIntegration;
+import org.springframework.integration.dsl.IntegrationFlow;
+import org.springframework.integration.dsl.Pollers;
 import org.springframework.integration.file.DefaultFileNameGenerator;
 import org.springframework.integration.file.FileReadingMessageSource;
 import org.springframework.integration.file.FileWritingMessageHandler;
@@ -20,6 +23,7 @@ import org.springframework.integration.file.support.FileExistsMode;
 import org.springframework.messaging.MessageHandler;
 
 import java.io.File;
+import java.time.Duration;
 
 @Configuration
 @EnableIntegration
@@ -31,6 +35,18 @@ public class SalesInfoIntegrationConfig {
     private String salesDir;
     private final Job job;
     private final JobRepository jobRepository;
+
+    @Bean
+    public IntegrationFlow integrationFlow(){
+        return IntegrationFlow.from(fileReadingMessageSource(),
+                sourcePolling -> sourcePolling.poller(Pollers.fixedDelay(Duration.ofSeconds(5)).maxMessagesPerPoll(1)))
+                .channel(fileIn())
+                .handle(fileRenameProcessHandler())
+                .transform(fileMessageToJobRequest())
+                .handle(jobLaunchingGateway())
+                .log()
+                .get();
+    }
 
     public FileReadingMessageSource fileReadingMessageSource(){
         var messageSource = new FileReadingMessageSource();
