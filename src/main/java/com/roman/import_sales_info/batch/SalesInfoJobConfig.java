@@ -2,6 +2,7 @@ package com.roman.import_sales_info.batch;
 
 import com.roman.import_sales_info.batch.dto.SalesInfoDto;
 import com.roman.import_sales_info.batch.faulttolerance.CustomSkipPolicy;
+import com.roman.import_sales_info.batch.listener.CustomJobExecutionListener;
 import com.roman.import_sales_info.batch.listener.CustomStepExecutionListener;
 import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
 import com.roman.import_sales_info.domain.SalesInfo;
@@ -42,11 +43,13 @@ public class SalesInfoJobConfig {
     private final SalesInfoItemProcessor itemProcessor;
     private final CustomSkipPolicy customSkipPolicy;
     private final CustomStepExecutionListener customStepExecutionListener;
+    private final CustomJobExecutionListener customJobExecutionListener;
     @Bean
     public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(fromFileToDb)
+                .listener(customJobExecutionListener)
                 .build();
     }
 
