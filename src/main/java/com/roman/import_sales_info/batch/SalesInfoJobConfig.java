@@ -19,6 +19,7 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.JpaItemWriter;
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.FlatFileParseException;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -55,6 +56,9 @@ public class SalesInfoJobConfig {
                 .reader(salesInfoDtoItemReader)
                 .processor(itemProcessor)
                 .writer(salesInfoJpaItemWriter())
+                .faultTolerant()
+                .skipLimit(10)
+                .skip(FlatFileParseException.class)
                 .build();
     }
     @Bean
