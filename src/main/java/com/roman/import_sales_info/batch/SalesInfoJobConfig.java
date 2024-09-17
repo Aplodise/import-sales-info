@@ -2,6 +2,7 @@ package com.roman.import_sales_info.batch;
 
 import com.roman.import_sales_info.batch.dto.SalesInfoDto;
 import com.roman.import_sales_info.batch.faulttolerance.CustomSkipPolicy;
+import com.roman.import_sales_info.batch.listener.CustomStepExecutionListener;
 import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
 import com.roman.import_sales_info.domain.SalesInfo;
 import jakarta.persistence.EntityManagerFactory;
@@ -40,6 +41,7 @@ public class SalesInfoJobConfig {
     private final EntityManagerFactory entityManagerFactory;
     private final SalesInfoItemProcessor itemProcessor;
     private final CustomSkipPolicy customSkipPolicy;
+    private final CustomStepExecutionListener customStepExecutionListener;
     @Bean
     public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb){
         return new JobBuilder("importSalesInfo", jobRepository)
@@ -58,6 +60,7 @@ public class SalesInfoJobConfig {
                 .writer(salesInfoJpaItemWriter())
                 .faultTolerant()
                 .skipPolicy(customSkipPolicy)
+                .listener(customStepExecutionListener)
                 .build();
     }
     @Bean
