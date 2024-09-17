@@ -8,6 +8,7 @@ import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
 import com.roman.import_sales_info.domain.SalesInfo;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -22,15 +23,18 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.database.JpaItemWriter;
 import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
-import org.springframework.batch.item.file.FlatFileParseException;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.kafka.KafkaItemWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
+
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
@@ -44,15 +48,17 @@ public class SalesInfoJobConfig {
     private final CustomSkipPolicy customSkipPolicy;
     private final CustomStepExecutionListener customStepExecutionListener;
     private final CustomJobExecutionListener customJobExecutionListener;
+    private final KafkaTemplate<String, SalesInfo> kafkaTemplate;
     @Bean
-    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb){
+    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToKafka){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
-                .start(fromFileToDb)
+                .start(fromFileToKafka)
                 .listener(customJobExecutionListener)
                 .build();
     }
 
+    // Step for persisting to the database
     @Bean
     public Step fromFileToDb(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader<SalesInfoDto> salesInfoDtoItemReader){
         return new StepBuilder("fromFileToDb", jobRepository)
@@ -61,6 +67,19 @@ public class SalesInfoJobConfig {
                 .reader(salesInfoDtoItemReader)
                 .processor(itemProcessor)
                 .writer(salesInfoJpaItemWriter())
+                .faultTolerant()
+                .skipPolicy(customSkipPolicy)
+                .listener(customStepExecutionListener)
+                .build();
+    }
+    @Bean
+    public Step fromFileToKafka(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager, ItemReader<SalesInfoDto> salesInfoDtoItemReader){
+        return new StepBuilder("fromFileToKafka", jobRepository)
+                .<SalesInfoDto, Future<SalesInfo>>chunk(100, platformTransactionManager)
+                .taskExecutor(taskExecutor())
+                .reader(salesInfoDtoItemReader)
+                .processor(asyncItemProcessor())
+                .writer(asyncItemWriter())
                 .faultTolerant()
                 .skipPolicy(customSkipPolicy)
                 .listener(customStepExecutionListener)
@@ -105,7 +124,17 @@ public class SalesInfoJobConfig {
     }
     public AsyncItemWriter<SalesInfo> asyncItemWriter(){
         var asyncItemWriter = new AsyncItemWriter<SalesInfo>();
-        asyncItemWriter.setDelegate(salesInfoJpaItemWriter());
+        asyncItemWriter.setDelegate(salesInfoKafkaItemWriter());
         return asyncItemWriter;
+    }
+    @Bean
+    @SneakyThrows
+    public KafkaItemWriter<String,SalesInfo> salesInfoKafkaItemWriter(){
+        var kafkaItemWriter = new KafkaItemWriter<String, SalesInfo>();
+        kafkaItemWriter.setKafkaTemplate(kafkaTemplate);
+        kafkaItemWriter.setItemKeyMapper(src -> String.valueOf(src.getSellerId()));
+        kafkaItemWriter.setDelete(Boolean.FALSE);
+        kafkaItemWriter.afterPropertiesSet();
+        return kafkaItemWriter;
     }
 }

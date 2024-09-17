@@ -42,8 +42,9 @@ public class CustomJobExecutionListener implements JobExecutionListener {
         if (ExitStatus.COMPLETED.equals(jobExecution.getExitStatus())){
             createDirectoryIfAbsent(processedPath);
             moveFile(absolutePathToFile, processedPath);
-        } else if (ExitStatus.FAILED.equals(jobExecution.getExitStatus())
-                || ExitStatus.STOPPED.equals(jobExecution.getExitStatus())) {
+        }
+        if(ExitStatus.FAILED.getExitCode().equals(jobExecution.getExitStatus().getExitCode()) ||
+                ExitStatus.STOPPED.getExitCode().equals(jobExecution.getExitStatus().getExitCode())) {
             createDirectoryIfAbsent(failedPath);
             moveFile(absolutePathToFile, failedPath);
         }
