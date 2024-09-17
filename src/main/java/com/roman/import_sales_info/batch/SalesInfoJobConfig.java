@@ -5,6 +5,7 @@ import com.roman.import_sales_info.batch.faulttolerance.CustomSkipPolicy;
 import com.roman.import_sales_info.batch.listener.CustomJobExecutionListener;
 import com.roman.import_sales_info.batch.listener.CustomStepExecutionListener;
 import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
+import com.roman.import_sales_info.batch.step.FileCollector;
 import com.roman.import_sales_info.domain.SalesInfo;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
@@ -49,11 +50,13 @@ public class SalesInfoJobConfig {
     private final CustomStepExecutionListener customStepExecutionListener;
     private final CustomJobExecutionListener customJobExecutionListener;
     private final KafkaTemplate<String, SalesInfo> kafkaTemplate;
+    private final FileCollector fileCollector;
     @Bean
-    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToKafka){
+    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToKafka, Step fileCollectorTaskletStep){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
                 .start(fromFileToKafka)
+                .next(fileCollectorTaskletStep)
                 .listener(customJobExecutionListener)
                 .build();
     }
@@ -85,6 +88,14 @@ public class SalesInfoJobConfig {
                 .listener(customStepExecutionListener)
                 .build();
     }
+
+    @Bean
+    public Step fileCollectorTaskletStep(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
+        return new StepBuilder("fileCollector", jobRepository)
+                .tasklet(fileCollector, platformTransactionManager)
+                .build();
+    }
+
     @Bean
     @StepScope
     public FlatFileItemReader<SalesInfoDto> salesInfoFileItemReader(@Value("#{jobParameters['input.file.name']}") String resource){
