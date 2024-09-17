@@ -1,6 +1,7 @@
 package com.roman.import_sales_info.batch;
 
 import com.roman.import_sales_info.batch.dto.SalesInfoDto;
+import com.roman.import_sales_info.batch.faulttolerance.CustomSkipPolicy;
 import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
 import com.roman.import_sales_info.domain.SalesInfo;
 import jakarta.persistence.EntityManagerFactory;
@@ -25,7 +26,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -39,7 +39,7 @@ public class SalesInfoJobConfig {
 
     private final EntityManagerFactory entityManagerFactory;
     private final SalesInfoItemProcessor itemProcessor;
-
+    private final CustomSkipPolicy customSkipPolicy;
     @Bean
     public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb){
         return new JobBuilder("importSalesInfo", jobRepository)
@@ -57,8 +57,7 @@ public class SalesInfoJobConfig {
                 .processor(itemProcessor)
                 .writer(salesInfoJpaItemWriter())
                 .faultTolerant()
-                .skipLimit(10)
-                .skip(FlatFileParseException.class)
+                .skipPolicy(customSkipPolicy)
                 .build();
     }
     @Bean
