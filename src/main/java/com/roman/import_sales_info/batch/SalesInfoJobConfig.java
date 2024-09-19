@@ -52,11 +52,11 @@ public class SalesInfoJobConfig {
     private final KafkaTemplate<String, SalesInfo> kafkaTemplate;
     private final FileCollector fileCollector;
     @Bean
-    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToKafka, Step fileCollectorTaskletStep){
+    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb, Step fileCollectorTaskletStep){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
-                .start(fromFileToKafka)
-                .next(fileCollectorTaskletStep)
+                .start(fromFileToDb).on("FAILED").end()
+                .from(fromFileToDb).on("COMPLETED").to(fileCollectorTaskletStep).end()
                 .listener(customJobExecutionListener)
                 .build();
     }
@@ -95,6 +95,7 @@ public class SalesInfoJobConfig {
                 .tasklet(fileCollector, platformTransactionManager)
                 .build();
     }
+
 
     @Bean
     @StepScope
