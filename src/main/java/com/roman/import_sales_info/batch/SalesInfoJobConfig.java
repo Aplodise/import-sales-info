@@ -6,6 +6,7 @@ import com.roman.import_sales_info.batch.listener.CustomJobExecutionListener;
 import com.roman.import_sales_info.batch.listener.CustomStepExecutionListener;
 import com.roman.import_sales_info.batch.processor.SalesInfoItemProcessor;
 import com.roman.import_sales_info.batch.step.FileCollector;
+import com.roman.import_sales_info.batch.step.SendEmail;
 import com.roman.import_sales_info.domain.SalesInfo;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
@@ -51,12 +52,14 @@ public class SalesInfoJobConfig {
     private final CustomJobExecutionListener customJobExecutionListener;
     private final KafkaTemplate<String, SalesInfo> kafkaTemplate;
     private final FileCollector fileCollector;
+    private final SendEmail sendEmail;
     @Bean
-    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb, Step fileCollectorTaskletStep){
+    public Job importSalesInfo(JobRepository jobRepository, Step fromFileToDb, Step fromFileToKafka, Step fileCollectorTaskletStep, Step sendEmailTasklet){
         return new JobBuilder("importSalesInfo", jobRepository)
                 .incrementer(new RunIdIncrementer())
-                .start(fromFileToDb).on("FAILED").end()
-                .from(fromFileToDb).on("COMPLETED").to(fileCollectorTaskletStep).end()
+                .start(fromFileToKafka).on("FAILED").end()
+                .from(fromFileToKafka).on("COMPLETED").to(fileCollectorTaskletStep)
+                .from(fromFileToKafka).on("COMPLETED WITH SKIPS").to(sendEmailTasklet).end()
                 .listener(customJobExecutionListener)
                 .build();
     }
@@ -96,6 +99,14 @@ public class SalesInfoJobConfig {
                 .build();
     }
 
+    @Bean
+    public Step sendEmailTasklet(JobRepository jobRepository, PlatformTransactionManager platformTransactionManager){
+        return new StepBuilder("send email tasklet", jobRepository)
+                .tasklet(sendEmail, platformTransactionManager)
+                .build();
+
+    }
+
 
     @Bean
     @StepScope
@@ -119,11 +130,11 @@ public class SalesInfoJobConfig {
 
     public TaskExecutor taskExecutor(){
         var executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(5);
-        executor.setQueueCapacity(10);
-        executor.setThreadNamePrefix("Thread N -> ");
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(15);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setThreadNamePrefix("Thread N-> :");
         executor.initialize();
         return executor;
     }
